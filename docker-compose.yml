@@ -12,7 +12,7 @@ services:
       - "3306:3306"
 
     volumes:
-      - ./mysql-data:/var/lib/mysql
+      - mysql-data:/var/lib/mysql
 
     networks:
       - springboot-mysql-network
@@ -29,7 +29,7 @@ services:
     container_name: springboot-app
 
     ports:
-      - "8085:8080"
+      - "8085:8081"
 
     depends_on:
       mysql-container:
@@ -45,4 +45,6 @@ services:
 
 networks:
   springboot-mysql-network:
-    name: springboot-mysql-network
+
+volumes:
+  mysql-data:
