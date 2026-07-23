@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Buy Stock - NammaStocks</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <style>
+        body { background-color: #f5f5f5; }
+        .chart-container { margin: 20px 0; min-height: 350px; }
+        .positive { color: #28a745; }
+        .negative { color: #dc3545; }
+        .card { border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .card-header { border-radius: 15px 15px 0 0 !important; font-weight: bold; }
+        .price { font-size: 2rem; font-weight: bold; color: #007bff; }
+        .stats-table td { padding: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container mt-4 mb-4">
+        <div class="row">
+            
+            <!-- Chart Column (Left Side) -->
+            <div class="col-md-7">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0" th:text="${stock.ticker} + ' - ' + ${stock.companyName}">Stock Name</h4>
+                        <small>Last 7 Days Performance Chart</small>
+                    </div>
+                    <div class="card-body">
+                        <!-- Chart will be drawn here -->
+                        <div id="stockChart"></div>
+                        <div class="text-muted text-center mt-2">
+                            <small>📈 Hover on chart to see exact prices</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Buy Form Column (Right Side) -->
+            <div class="col-md-5">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h4 class="mb-0">💰 Buy Stock</h4>
+                    </div>
+                    <div class="card-body">
+                        <form action="/confirm-buy" method="post">
+                            <input type="hidden" name="ticker" th:value="${stock.ticker}">
+                            <input type="hidden" name="price" th:value="${stock.price}">
+                            
+                            <div class="mb-3 text-center">
+                                <label class="form-label">Current Market Price</label>
+                                <div class="price">₹ <span th:text="${stock.price}"></span></div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <label class="form-label">Available</label>
+                                    <p class="fw-bold" th:text="${stock.quantity} + ' shares'"></p>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label">Wallet Balance</label>
+                                    <p class="fw-bold text-success">₹ <span th:text="${user.amount}"></span></p>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="quantity" class="form-label">📊 Quantity to Buy</label>
+                                <input type="number" class="form-control form-control-lg" id="quantity" name="quantity" 
+                                       min="1" th:max="${stock.quantity}" step="1" required>
+                                <div class="form-text mt-2">
+                                    <strong>Total Cost: ₹ <span id="totalCost">0</span></strong>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-warning" id="balanceWarning" style="display: none;">
+                                ⚠️ Insufficient wallet balance!
+                            </div>
+                            
+                            <button type="submit" class="btn btn-success w-100 py-2" id="buyBtn" style="font-weight: bold;">
+                                ✅ Confirm Purchase
+                            </button>
+                            <a href="/view-stocks" class="btn btn-secondary w-100 mt-2">← Back to Stocks</a>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- 7-Day Statistics Card -->
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">📊 7-Day Performance</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="stats">
+                            <p class="text-center">Calculating statistics...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Wait for page to fully load
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            // Get stock data from Thymeleaf
+            const ticker = '[[${stock.ticker}]]';
+            const currentPrice = [[${stock.price}]];
+            const walletBalance = [[${user.amount}]];
+            
+            console.log("Ticker:", ticker);
+            console.log("Current Price:", currentPrice);
+            
+            // Create 7 days of mock price data
+            const dates = [];
+            const prices = [];
+            
+            // Start from 7 days ago to today
+            const basePrice = currentPrice;
+            
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const dateStr = date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+                dates.push(dateStr);
+                
+                // Generate varied prices around the base price
+                let variation = 0;
+                if (i === 6) variation = -3.5;      // 7 days ago: -3.5%
+                else if (i === 5) variation = -2.0;
+                else if (i === 4) variation = 1.5;
+                else if (i === 3) variation = 0.5;
+                else if (i === 2) variation = 2.0;
+                else if (i === 1) variation = -1.0;
+                else if (i === 0) variation = 0;     // Today: current price
+                
+                let price = basePrice * (1 + variation / 100);
+                price = Math.round(price * 100) / 100;
+                prices.push(price);
+            }
+            
+            console.log("Dates:", dates);
+            console.log("Prices:", prices);
+            
+            // Check if ApexCharts is loaded
+            if (typeof ApexCharts !== 'undefined') {
+                // Check if price went up or down
+                const isUp = prices[6] >= prices[0];
+                const lineColor = isUp ? '#28a745' : '#dc3545';
+                
+                const options = {
+                    series: [{
+                        name: 'Stock Price',
+                        data: prices,
+                        type: 'line'
+                    }],
+                    chart: {
+                        height: 350,
+                        type: 'line',
+                        toolbar: { show: true }
+                    },
+                    stroke: {
+                        curve: 'smooth',
+                        width: 3,
+                        color: lineColor
+                    },
+                    markers: {
+                        size: 6,
+                        colors: [lineColor],
+                        strokeColors: '#fff',
+                        strokeWidth: 2
+                    },
+                    xaxis: {
+                        categories: dates,
+                        title: { text: 'Date' }
+                    },
+                    yaxis: {
+                        title: { text: 'Price (₹)' },
+                        labels: {
+                            formatter: function(value) {
+                                return '₹' + value.toFixed(2);
+                            }
+                        }
+                    },
+                    tooltip: {
+                        y: {
+                            formatter: function(value) {
+                                return '₹' + value.toFixed(2);
+                            }
+                        }
+                    },
+                    colors: [lineColor],
+                    title: {
+                        text: '📈 Stock Price Movement - Last 7 Days',
+                        align: 'center'
+                    }
+                };
+                
+                const chart = new ApexCharts(document.querySelector("#stockChart"), options);
+                chart.render();
+            } else {
+                document.getElementById('stockChart').innerHTML = '<div class="alert alert-danger">Chart library failed to load. Check your internet connection.</div>';
+            }
+            
+            // Calculate and display statistics
+            const startPrice = prices[0];
+            const endPrice = prices[6];
+            const change = endPrice - startPrice;
+            const changePercent = (change / startPrice) * 100;
+            const avgPrice = prices.reduce((a, b) => a + b, 0) / 7;
+            const maxPrice = Math.max(...prices);
+            const minPrice = Math.min(...prices);
+            
+            const changeClass = change >= 0 ? 'positive' : 'negative';
+            const changeSymbol = change >= 0 ? '▲' : '▼';
+            
+            const statsHtml = `
+                <table class="table table-sm stats-table">
+                    <tr class="${changeClass}">
+                        <td><strong>${changeSymbol} ${change >= 0 ? 'Gain' : 'Loss'}:</strong></td>
+                        <td class="text-end fw-bold">${change >= 0 ? '+' : ''}${change.toFixed(2)} (${changePercent.toFixed(2)}%)</td>
+                     </tr>
+                     <tr>
+                        <td><strong>📊 7-Day Avg:</strong></td>
+                        <td class="text-end">₹${avgPrice.toFixed(2)}</td>
+                     </tr>
+                     <tr class="positive">
+                        <td><strong>📈 7-Day High:</strong></td>
+                        <td class="text-end">₹${maxPrice.toFixed(2)}</td>
+                     </tr>
+                     <tr class="negative">
+                        <td><strong>📉 7-Day Low:</strong></td>
+                        <td class="text-end">₹${minPrice.toFixed(2)}</td>
+                     </tr>
+                     <tr>
+                        <td><strong>📅 Start Price:</strong></td>
+                        <td class="text-end">₹${startPrice.toFixed(2)}</td>
+                     </tr>
+                     <tr>
+                        <td><strong>🎯 Current Price:</strong></td>
+                        <td class="text-end">₹${endPrice.toFixed(2)}</td>
+                     </tr>
+                 </table>
+                 <div class="alert alert-light text-center small mt-2 mb-0">
+                     💡 Tip: Consider buying when price is near 7-day low
+                 </div>
+            `;
+            
+            document.getElementById('stats').innerHTML = statsHtml;
+            
+            // Quantity input handler
+            const quantityInput = document.getElementById('quantity');
+            if (quantityInput) {
+                quantityInput.addEventListener('input', function() {
+                    const quantity = parseInt(this.value) || 0;
+                    const total = quantity * currentPrice;
+                    const totalCostSpan = document.getElementById('totalCost');
+                    const buyBtn = document.getElementById('buyBtn');
+                    const warningDiv = document.getElementById('balanceWarning');
+                    
+                    if (totalCostSpan) totalCostSpan.innerText = total.toFixed(2);
+                    
+                    if (total > walletBalance && quantity > 0) {
+                        if (buyBtn) buyBtn.disabled = true;
+                        if (warningDiv) warningDiv.style.display = 'block';
+                    } else if (quantity <= 0) {
+                        if (buyBtn) buyBtn.disabled = true;
+                        if (warningDiv) warningDiv.style.display = 'none';
+                    } else {
+                        if (buyBtn) buyBtn.disabled = false;
+                        if (warningDiv) warningDiv.style.display = 'none';
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
