@@ -24,7 +24,7 @@ pipeline {
             }
             steps {
                 echo "Building Spring Boot JAR..."
-                sh 'mvn clean package -DskipTests'  // Added -DskipTests
+                sh 'mvn clean package -DskipTests'
             }
         }
 
@@ -34,10 +34,10 @@ pipeline {
             }
             steps {
                 echo "Deploying Docker Containers..."
-                // FIXED: Removed --build flag, using separate build command
+                // FIXED: Using docker-compose (with hyphen) instead of docker compose
                 sh '''
-                    docker compose build
-                    docker compose up -d
+                    docker-compose build
+                    docker-compose up -d
                 '''
             }
         }
@@ -48,7 +48,8 @@ pipeline {
             }
             steps {
                 echo "Stopping and Removing Containers..."
-                sh 'docker compose down'
+                // FIXED: Using docker-compose (with hyphen)
+                sh 'docker-compose down'
                 sh 'docker image prune -af'
             }
         }
