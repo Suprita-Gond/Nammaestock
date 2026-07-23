@@ -18,6 +18,7 @@ pipeline {
     }
 
     stages {
+
         stage('Build JAR') {
             when {
                 expression { params.ACTION == 'DEPLOY' }
@@ -34,10 +35,9 @@ pipeline {
             }
             steps {
                 echo "Deploying Docker Containers..."
-                // FIXED: Using docker-compose (with hyphen) instead of docker compose
                 sh '''
-                    docker-compose build
-                    docker-compose up -d
+                    docker compose build
+                    docker compose up -d
                 '''
             }
         }
@@ -47,13 +47,15 @@ pipeline {
                 expression { params.ACTION == 'REMOVE' }
             }
             steps {
-                echo "Stopping and Removing Containers..."
-                // FIXED: Using docker-compose (with hyphen)
-                sh 'docker-compose down'
-                sh 'docker image prune -af'
+                echo "Stopping Docker Containers..."
+                sh '''
+                    docker compose down
+                    docker image prune -af
+                '''
             }
         }
     }
+
     post {
         success {
             echo "Pipeline executed successfully..."
