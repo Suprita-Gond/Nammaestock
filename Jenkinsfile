@@ -1,4 +1,5 @@
 pipeline {
+
     agent any
 
     tools {
@@ -6,6 +7,7 @@ pipeline {
     }
 
     parameters {
+
         choice(
             name: 'ACTION',
             choices: [
@@ -21,6 +23,7 @@ pipeline {
 
 
     environment {
+
         IMAGE_NAME = "suprita11/nammaestock"
         IMAGE_TAG = "v1"
     }
@@ -38,11 +41,9 @@ pipeline {
             }
 
             steps {
-                echo "Preparing build..."
                 sh 'mvn clean'
             }
         }
-
 
 
         stage('Build Project') {
@@ -59,7 +60,6 @@ pipeline {
         }
 
 
-
         stage('Build Docker Image') {
 
             when {
@@ -74,7 +74,6 @@ pipeline {
         }
 
 
-
         stage('Docker Login') {
 
             when {
@@ -85,11 +84,13 @@ pipeline {
 
             steps {
 
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
 
                     sh '''
                     echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
@@ -97,7 +98,6 @@ pipeline {
                 }
             }
         }
-
 
 
         stage('Tag Docker Image') {
@@ -112,7 +112,6 @@ pipeline {
                 sh 'docker tag nammaestock:v1 $IMAGE_NAME:$IMAGE_TAG'
             }
         }
-
 
 
         stage('Push Docker Image') {
@@ -141,8 +140,9 @@ pipeline {
             steps {
 
                 sh '''
-                kubectl apply -f kubernetes/mysql-statefulset.yaml
-                kubectl apply -f kubernetes/mysql-service.yaml
+                kubectl apply -f kubernetes/namespace.yaml
+                kubectl apply -f kubernetes/mysql-statefulset.yaml -n production
+                kubectl apply -f kubernetes/mysql-service.yaml -n production
                 '''
             }
         }
@@ -160,8 +160,8 @@ pipeline {
             steps {
 
                 sh '''
-                kubectl apply -f kubernetes/nammaestock-deployment.yaml
-                kubectl apply -f kubernetes/nammaestock-service.yaml
+                kubectl apply -f kubernetes/app-deployment.yaml -n production
+                kubectl apply -f kubernetes/app-service.yaml -n production
                 '''
             }
         }
@@ -179,8 +179,8 @@ pipeline {
             steps {
 
                 sh '''
-                kubectl delete -f kubernetes/nammaestock-deployment.yaml
-                kubectl delete -f kubernetes/nammaestock-service.yaml
+                kubectl delete -f kubernetes/app-deployment.yaml -n production || true
+                kubectl delete -f kubernetes/app-service.yaml -n production || true
                 '''
             }
         }
@@ -198,8 +198,8 @@ pipeline {
             steps {
 
                 sh '''
-                kubectl delete -f kubernetes/mysql-statefulset.yaml
-                kubectl delete -f kubernetes/mysql-service.yaml
+                kubectl delete -f kubernetes/mysql-statefulset.yaml -n production || true
+                kubectl delete -f kubernetes/mysql-service.yaml -n production || true
                 '''
             }
         }
@@ -218,6 +218,7 @@ pipeline {
                 sh 'docker system prune -f'
             }
         }
+
     }
 
 
@@ -230,5 +231,7 @@ pipeline {
         failure {
             echo 'Pipeline failed.'
         }
+
     }
+
 }
