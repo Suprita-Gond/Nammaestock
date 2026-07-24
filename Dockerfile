@@ -1,6 +1,9 @@
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:21-jdk
+
 WORKDIR /app
-# Use wildcard to match any JAR file
+
 COPY target/*.jar app.jar
+
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+
+ENTRYPOINT ["java","-jar","app.jar"]
