@@ -142,7 +142,7 @@ pipeline {
                 sh '''
                 kubectl apply -f kubernetes/namespace.yaml
                 kubectl apply -f kubernetes/mysql-statefulset.yaml -n production
-                kubectl apply -f kubernetes/mysql-service.yaml -n production
+                kubectl apply -f kubernetes/mysql-service.yaml -n production || true
                 '''
             }
         }
