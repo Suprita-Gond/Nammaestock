@@ -1,70 +1,72 @@
 pipeline {
     agent any
 
-    parameters {
-        choice(
-            name: 'ACTION',
-            choices: ['DEPLOY', 'REMOVE'],
-            description: 'Choose whether to deploy or remove containers'
-        )
-    }
-
     tools {
         maven 'maven'
     }
 
     environment {
-        APP_NAME = "springboot-app"
+        IMAGE_NAME = "suprita11/nammaestock"
+        IMAGE_TAG = "v1"
     }
 
     stages {
 
-        stage('Build JAR') {
-            when {
-                expression { params.ACTION == 'DEPLOY' }
-            }
+        stage('Prepare Build') {
             steps {
-                echo "Building Spring Boot JAR..."
-                sh 'mvn clean package -DskipTests'
+                echo "Preparing build..."
+                sh 'mvn clean'
             }
         }
 
-        stage('Deploy Application') {
-            when {
-                expression { params.ACTION == 'DEPLOY' }
-            }
+        stage('Build Project') {
             steps {
-                echo "Deploying Docker Containers..."
-                sh '''
-                    docker compose build
-                    docker compose up -d
-                '''
+                sh 'mvn package'
             }
         }
 
-        stage('Remove Application') {
-            when {
-                expression { params.ACTION == 'REMOVE' }
-            }
+        stage('Build Docker Image') {
             steps {
-                echo "Stopping Docker Containers..."
-                sh '''
-                    docker compose down
-                    docker image prune -af
-                '''
+                sh 'docker build -t nammaestock:v1 .'
+            }
+        }
+
+        stage('Docker Login') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                    echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                    '''
+                }
+            }
+        }
+
+        stage('Tag Docker Image') {
+            steps {
+                sh 'docker tag nammaestock:v1 $IMAGE_NAME:$IMAGE_TAG'
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                sh 'docker push $IMAGE_NAME:$IMAGE_TAG'
+            }
+        }
+
+        stage('Clean System') {
+            steps {
+                sh 'docker system prune -f'
             }
         }
     }
 
     post {
         success {
-            echo "Pipeline executed successfully..."
+            echo 'Pipeline completed successfully.'
         }
+
         failure {
-            echo "Pipeline execution failed..."
-        }
-        always {
-            echo "Pipeline completed..."
+            echo 'Pipeline failed.'
         }
     }
 }
