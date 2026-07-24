@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: nammaestock-app
+  namespace: production
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: nammaestock
+
+  template:
+    metadata:
+      labels:
+        app: nammaestock
+
+    spec:
+      containers:
+      - name: nammaestock
+
+        image: suprita11/nammaestock:v1
+
+        ports:
+        - containerPort: 8080
